@@ -13,6 +13,7 @@ import imagenesRoutes from "./routes/imagenes.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import { initialSetup } from "./libs/initialSetup.js";
 import dotenv from "dotenv";
+import path from "path";
 
 dotenv.config();
 
@@ -27,9 +28,18 @@ const server = http.createServer(app); // Crear servidor HTTP con Express
 // Configuración de CORS
 app.use(
   cors({
-    origin: `http://${process.env.HOST || "localhost"}:${
-      process.env.PORT || 5173
-    }`,
+    origin: function (origin, callback) {
+      // Permite solicitudes desde el nuevo dominio y localhost
+      if (
+        !origin ||
+        origin === `http://${process.env.HOST}:${process.env.PORT || 5173}` ||
+        origin === `http://localhost:5173`
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("No permitido por CORS"));
+      }
+    },
     credentials: true,
   })
 );
@@ -38,6 +48,7 @@ app.use(morgan("dev"));
 app.use(cookieParser());
 app.use(express.json());
 
+// Configuración de rutas API
 app.use("/api", authRoutes);
 app.use("/api/escultores/", escultoresRoutes);
 app.use("/api/", eventosRoutes);
@@ -50,9 +61,18 @@ app.use("/api/vota", votaRoutes);
 // Configuración de WebSockets
 const io = new Server(server, {
   cors: {
-    origin: `http://${process.env.HOST || "localhost"}:${
-      process.env.PORT || 5173
-    }`,
+    origin: function (origin, callback) {
+      // Permite solicitudes desde el nuevo dominio y localhost
+      if (
+        !origin ||
+        origin === `http://${process.env.HOST}:${process.env.PORT || 5173}` ||
+        origin === `http://localhost:5173`
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("No permitido por CORS"));
+      }
+    },
     credentials: true,
   },
 });
@@ -68,6 +88,15 @@ io.on("connection", (socket) => {
 
 // Exportar el objeto io para usarlo en otros módulos
 export { io };
+
+// Servir archivos estáticos del cliente generado por Vite
+const __dirname = path.resolve(); // Obtener el directorio actual
+app.use(express.static(path.join(__dirname, "client/dist")));
+
+// Manejar rutas no definidas y redirigir al index.html del cliente
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client/dist", "index.html"));
+});
 
 // Inicialización de configuraciones específicas
 initialSetup();
